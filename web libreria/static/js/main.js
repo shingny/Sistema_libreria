@@ -158,22 +158,25 @@
   /* ------------------------------ Render libros ---------------------------- */
   function plantillaCard(libro) {
     var imagen = libro.imagen || "/static/img/placeholder.svg";
+    var url = libro.url || ("/libro/" + libro.id);
     return [
-      '<article class="card" data-id="' + libro.id + '" style="--card-color:' + escaparHtml(libro.categoria_color) + '" tabindex="0">',
-      '  <div class="card__media">',
-      '    <img src="' + escaparHtml(imagen) + '" alt="Portada de ' + escaparHtml(libro.titulo) + '" loading="lazy">',
-      '    <span class="card__cat">' + escaparHtml(libro.categoria) + "</span>",
+      '<article class="card" data-id="' + libro.id + '" style="--card-color:' + escaparHtml(libro.categoria_color) + '">',
+      '  <a class="card__link" href="' + escaparHtml(url) + '">',
+      '    <div class="card__media">',
+      '      <img src="' + escaparHtml(imagen) + '" alt="Portada de ' + escaparHtml(libro.titulo) + '" loading="lazy" width="400" height="600">',
+      '      <span class="card__cat">' + escaparHtml(libro.categoria) + "</span>",
       (libro.destacado ? '<span class="card__fav" title="Libro destacado"><svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg></span>' : ""),
-      "  </div>",
-      '  <div class="card__body">',
-      '    <h3 class="card__title">' + escaparHtml(libro.titulo) + "</h3>",
-      '    <p class="card__author">' + escaparHtml(libro.autor) + "</p>",
-      '    <div class="card__foot">',
-      '      <div class="card__price">' + soles(libro.precio) + "<small>Precio</small></div>",
-      '      <button class="card__btn" data-consultar="' + libro.id + '" aria-label="Consultar por WhatsApp">',
-      '        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.22 3.08.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.19 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35zM12.04 2.02c-5.5 0-9.96 4.46-9.96 9.96 0 1.76.46 3.41 1.27 4.85L2 22l5.32-1.4c1.38.75 2.97 1.18 4.66 1.18h.01c5.5 0 9.96-4.46 9.96-9.96 0-2.66-1.04-5.16-2.93-7.04a9.9 9.9 0 0 0-6.98-2.9z"/></svg>',
-      "      </button>",
       "    </div>",
+      '    <div class="card__body">',
+      '      <h3 class="card__title">' + escaparHtml(libro.titulo) + "</h3>",
+      '      <p class="card__author">' + escaparHtml(libro.autor) + "</p>",
+      "    </div>",
+      "  </a>",
+      '  <div class="card__foot">',
+      '    <div class="card__price">' + soles(libro.precio) + "<small>Precio</small></div>",
+      '    <button class="card__btn" data-consultar="' + libro.id + '" aria-label="Consultar por WhatsApp">',
+      '      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.22 3.08.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.19 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35zM12.04 2.02c-5.5 0-9.96 4.46-9.96 9.96 0 1.76.46 3.41 1.27 4.85L2 22l5.32-1.4c1.38.75 2.97 1.18 4.66 1.18h.01c5.5 0 9.96-4.46 9.96-9.96 0-2.66-1.04-5.16-2.93-7.04a9.9 9.9 0 0 0-6.98-2.9z"/></svg>',
+      "    </button>",
       "  </div>",
       "</article>"
     ].join("");
@@ -337,9 +340,7 @@
   }
 
   /* -------------------------------- Eventos -------------------------------- */
-  function iniciarEventos() {
-    iniciarMenu();
-
+  function iniciarCatalogo() {
     // Busqueda (con retardador para no saturar el servidor)
     var buscar = debounce(function () {
       estado.q = searchInput.value.trim();
@@ -384,25 +385,23 @@
     grid.addEventListener("click", function (e) {
       var btn = e.target.closest("[data-consultar]");
       if (btn) {
+        e.preventDefault();
         e.stopPropagation();
         var libro = buscarLibro(btn.dataset.consultar);
         if (libro) consultarLibro(libro);
         return;
       }
-      var card = e.target.closest(".card");
-      if (card) {
-        var l = buscarLibro(card.dataset.id);
-        if (l) abrirModal(l);
-      }
-    });
 
-    // Accesibilidad por teclado en tarjetas
-    grid.addEventListener("keydown", function (e) {
-      if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("card")) {
-        e.preventDefault();
-        var l = buscarLibro(e.target.dataset.id);
-        if (l) abrirModal(l);
-      }
+      var card = e.target.closest(".card");
+      if (!card) return;
+
+      // Ctrl/Cmd/Shift o boton central: se deja abrir la ficha real en otra pestana.
+      if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+
+      var l = buscarLibro(card.dataset.id);
+      if (!l) return;
+      e.preventDefault();
+      abrirModal(l);
     });
 
     // Modal
@@ -419,19 +418,47 @@
       if (e.key === "Escape" && !modal.hidden) cerrarModal();
     });
 
-    // Cabecera con sombra al hacer scroll
-    window.addEventListener("scroll", function () {
-      topbar.classList.toggle("is-stuck", window.scrollY > 8);
-    }, { passive: true });
+  }
 
-    // Enlaces generales de WhatsApp
+  // Se ejecuta en todas las paginas (inicio y ficha de libro).
+  function iniciarEventos() {
+    iniciarMenu();
+
+    // Cabecera con sombra al hacer scroll
+    if (topbar) {
+      window.addEventListener("scroll", function () {
+        topbar.classList.toggle("is-stuck", window.scrollY > 8);
+      }, { passive: true });
+    }
+
     var msgGeneral = "Hola " + (CFG.nombreLibreria || "Libreria") + " \uD83D\uDC4B, quisiera mas informacion sobre su catalogo de libros.";
     ["#waHeader", "#waMenu", "#waContacto", "#waFab"].forEach(function (sel) {
       var el = document.querySelector(sel);
       if (el) el.href = enlaceWhatsApp(msgGeneral);
     });
 
-    $("#year").textContent = new Date().getFullYear();
+    // Boton de WhatsApp de la ficha del libro: registra la consulta sin
+    // bloquear la navegacion (misma tabla que usa el catalogo).
+    document.querySelectorAll("[data-consultar]").forEach(function (el) {
+      if (el.closest("#grid") || el.closest("#modal")) return;
+      el.addEventListener("click", function () {
+        try {
+          fetch("/api/consultas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ libro_id: Number(el.dataset.consultar) })
+          }).catch(function () {});
+        } catch (e) { /* ignorar */ }
+      });
+    });
+
+    var anio = $("#year");
+    if (anio) anio.textContent = new Date().getFullYear();
+
+    // La ficha de un libro no tiene catalogo: solo cabecera, menu y enlaces.
+    if (!grid || !chips || !searchInput || !ordenSelect || !empty ||
+        !contador || !tituloCatalogo || !searchClear) return;
+    iniciarCatalogo();
   }
 
   function buscarLibro(id) {
@@ -442,6 +469,6 @@
   /* --------------------------------- Inicio -------------------------------- */
   document.addEventListener("DOMContentLoaded", function () {
     iniciarEventos();
-    cargarCategorias().then(cargarLibros);
+    if (grid) cargarCategorias().then(cargarLibros);
   });
 })();

@@ -27,15 +27,27 @@ Variables de entorno opcionales:
     ADMIN_TOKEN, SECRET_KEY, HTTPS=1, HOST, PORT, FLASK_DEBUG=1
 """
 
+import json
 import os
 import secrets
+from datetime import datetime
 from urllib.parse import quote
 
 import pymysql
-from flask import Flask, g, jsonify, render_template, request
+from flask import (
+    Flask,
+    abort,
+    g,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 
 import db as bd
 import seguridad
+from init_db import slugify
 
 
 def _env(nombre, por_defecto):
@@ -97,6 +109,11 @@ REDES = [
 # Cuando el sitio se publique con HTTPS, arrancar con HTTPS=1.
 SEGURO_HTTPS = os.environ.get("HTTPS") in ("1", "true", "si", "yes")
 
+# URL publica del sitio. Se usa en og:image, canonical y sitemap. En local se
+# detecta sola; al publicar conviene fijarla, por ejemplo:
+#     SITIO_URL=https://sistema42.alwaysdata.net
+SITIO_URL = _env("SITIO_URL", "").rstrip("/")
+
 # Token para consultar el listado de solicitudes. Si no se define, se genera
 # uno aleatorio en cada arranque y se muestra por consola.
 ADMIN_TOKEN = _env("ADMIN_TOKEN", "")
@@ -131,6 +148,106 @@ def cerrar_db(_exception):
     db = getattr(g, "_database", None)
     if db is not None:
         db.close()
+
+
+# ------------------------------ SEO y enlaces --------------------------------
+def url_absoluta(ruta):
+    """Convierte una ruta interna en URL absoluta (og:image, canonical, sitemap)."""
+    return (SITIO_URL or request.url_root.rstrip("/")) + ruta
+
+
+def ruta_libro(libro):
+    """Ruta canonica y estable de la ficha de un libro."""
+    return "/libro/{}-{}".format(libro["id"], slugify(libro["titulo"]))
+
+
+def precio_soles(valor):
+    return "S/ {:.2f}".format(float(valor or 0))
+
+
+def mensaje_libro(libro):
+    """Mismo texto que arma el JavaScript: titulo en negrita y precio."""
+    return (
+        "Hola {nombre} \U0001F44B\n\n"
+        "Me interesa este libro:\n\n"
+        "\U0001F4D5 *{titulo}*\n"
+        "\U0001F4B0 Precio: {precio}\n\n"
+        "\u00BFEsta disponible? \u00A1Gracias!"
+    ).format(
+        nombre=NOMBRE_LIBRERIA,
+        titulo=libro["titulo"],
+        precio=precio_soles(libro["precio"]),
+    )
+
+
+def enlace_whatsapp(mensaje):
+    return "https://wa.me/{}?text={}".format(WHATSAPP_NUMERO, quote(mensaje))
+
+
+def imagen_social(libro=None):
+    """
+    Imagen para las vistas previas al compartir el enlace. WhatsApp y Facebook
+    no muestran SVG, asi que si la portada no es una imagen de mapa de bits se
+    usa la tarjeta generica de la libreria.
+    """
+    if libro:
+        ruta = libro.get("imagen") or ""
+        if ruta.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+            return url_absoluta(ruta)
+    return url_absoluta(url_for("static", filename="img/og-default.png"))
+
+
+def json_ld(datos):
+    """JSON-LD serializado sin permitir cerrar la etiqueta <script>."""
+    return json.dumps(datos, ensure_ascii=False).replace("<", "\\u003c")
+
+
+def texto_corto(texto, limite=160):
+    """Resume un texto para usarlo como meta descripcion."""
+    limpio = " ".join((texto or "").split())
+    if len(limpio) <= limite:
+        return limpio
+    return limpio[:limite - 3].rstrip() + "..."
+
+
+def contexto_sitio():
+    """Datos de la libreria que necesitan todas las plantillas."""
+    return {
+        "nombre_libreria": NOMBRE_LIBRERIA,
+        "slogan": SLOGAN,
+        "whatsapp": WHATSAPP_NUMERO,
+        "whatsapp_display": WHATSAPP_DISPLAY,
+        "direccion": DIRECCION,
+        "referencia": REFERENCIA,
+        "mapa_url": MAPA_URL,
+        "correo": CORREO,
+        "horario": HORARIO,
+        "redes": REDES,
+    }
+
+
+@app.context_processor
+def inyectar_datos_comunes():
+    mensaje = (
+        "Hola {} \U0001F44B, quisiera mas informacion sobre su catalogo de libros."
+    ).format(NOMBRE_LIBRERIA)
+    return {
+        "wa_general": enlace_whatsapp(mensaje),
+        "anio_actual": datetime.now().year,
+    }
+
+
+def obtener_libro(libro_id):
+    return get_db().execute(
+        """
+        SELECT l.*, c.nombre AS categoria, c.slug AS categoria_slug,
+               c.color AS categoria_color
+        FROM libros l
+        JOIN categorias c ON c.id = l.categoria_id
+        WHERE l.id = %s
+        """,
+        (libro_id,),
+    ).fetchone()
 
 
 # --------------------------------- Seguridad ---------------------------------
@@ -205,19 +322,195 @@ def error_mysql(_e):
 # ---------------------------------- Vistas -----------------------------------
 @app.route("/")
 def index():
-    return render_template(
-        "index.html",
-        nombre_libreria=NOMBRE_LIBRERIA,
-        slogan=SLOGAN,
-        whatsapp=WHATSAPP_NUMERO,
-        whatsapp_display=WHATSAPP_DISPLAY,
-        direccion=DIRECCION,
-        referencia=REFERENCIA,
-        mapa_url=MAPA_URL,
-        correo=CORREO,
-        horario=HORARIO,
-        redes=REDES,
-    )
+    total = get_db().execute(
+        "SELECT COUNT(*) AS total FROM libros"
+    ).fetchone()["total"]
+
+    canonical = url_absoluta("/")
+    descripcion = (
+        "Catalogo de libros de {}: literatura, ciencia ficcion, infantil, "
+        "historia y mas. Consulta precios y disponibilidad por WhatsApp."
+    ).format(NOMBRE_LIBRERIA)
+
+    datos_ld = {
+        "@context": "https://schema.org",
+        "@type": "BookStore",
+        "name": NOMBRE_LIBRERIA,
+        "description": SLOGAN,
+        "url": canonical,
+        "image": imagen_social(),
+        "telephone": "+" + WHATSAPP_NUMERO,
+        "email": CORREO,
+        "priceRange": "S/",
+        "address": {
+            "@type": "PostalAddress",
+            "streetAddress": DIRECCION,
+            "addressLocality": "Lima",
+            "addressCountry": "PE",
+        },
+        "openingHours": HORARIO,
+        "sameAs": [r["url"] for r in REDES if r["icono"] != "whatsapp"],
+    }
+
+    datos = contexto_sitio()
+    datos.update({
+        "total_libros": total,
+        "canonical": canonical,
+        "titulo_seo": "{} | Catalogo de Libros".format(NOMBRE_LIBRERIA),
+        "og_descripcion": descripcion,
+        "og_imagen": imagen_social(),
+        "json_ld": json_ld(datos_ld),
+    })
+    return render_template("index.html", **datos)
+
+
+# ------------------------- Ficha publica de cada libro -----------------------
+@app.route("/libro/<int:libro_id>")
+@seguridad.limitar(180, 60)
+def libro_sin_slug(libro_id):
+    """Enlace corto: /libro/7 -> /libro/7-titulo-del-libro (301 permanente)."""
+    fila = obtener_libro(libro_id)
+    if fila is None:
+        abort(404)
+    return redirect(ruta_libro(dict(fila)), code=301)
+
+
+@app.route("/libro/<int:libro_id>-<slug>")
+@seguridad.limitar(180, 60)
+def libro(libro_id, slug):
+    fila = obtener_libro(libro_id)
+    if fila is None:
+        abort(404)
+
+    libro_datos = dict(fila)
+    libro_datos["url"] = ruta_libro(libro_datos)
+    libro_datos["precio_fmt"] = precio_soles(libro_datos["precio"])
+
+    # Si el titulo cambio, el slug antiguo sigue funcionando: se redirige al
+    # canonico para no partir el posicionamiento en buscadores.
+    if "/libro/{}-{}".format(libro_id, slug) != libro_datos["url"]:
+        return redirect(libro_datos["url"], code=301)
+
+    filas_relacionados = get_db().execute(
+        """
+        SELECT l.id, l.titulo, l.autor, l.imagen, l.precio
+        FROM libros l
+        WHERE l.categoria_id = %s AND l.id <> %s
+        ORDER BY l.destacado DESC, l.titulo ASC
+        LIMIT 4
+        """,
+        (libro_datos["categoria_id"], libro_id),
+    ).fetchall()
+
+    relacionados = []
+    for fila_rel in filas_relacionados:
+        dato = dict(fila_rel)
+        dato["url"] = ruta_libro(dato)
+        dato["precio_fmt"] = precio_soles(dato["precio"])
+        relacionados.append(dato)
+
+    descripcion = texto_corto(libro_datos.get("descripcion"))
+    if not descripcion:
+        descripcion = "{} de {}. Disponible en {}.".format(
+            libro_datos["titulo"], libro_datos["autor"], NOMBRE_LIBRERIA
+        )
+
+    canonical = url_absoluta(libro_datos["url"])
+
+    datos_ld = {
+        "@context": "https://schema.org",
+        "@type": "Book",
+        "name": libro_datos["titulo"],
+        "author": {"@type": "Person", "name": libro_datos["autor"]},
+        "inLanguage": "es",
+        "url": canonical,
+        "image": imagen_social(libro_datos),
+        "description": descripcion,
+        "offers": {
+            "@type": "Offer",
+            "price": "{:.2f}".format(float(libro_datos["precio"])),
+            "priceCurrency": "PEN",
+            "availability": "https://schema.org/InStock",
+            "url": canonical,
+            "seller": {"@type": "BookStore", "name": NOMBRE_LIBRERIA},
+        },
+    }
+    if libro_datos.get("editorial"):
+        datos_ld["publisher"] = {
+            "@type": "Organization",
+            "name": libro_datos["editorial"],
+        }
+    if libro_datos.get("isbn"):
+        datos_ld["isbn"] = libro_datos["isbn"]
+    if libro_datos.get("anio"):
+        datos_ld["datePublished"] = str(libro_datos["anio"])
+
+    datos = contexto_sitio()
+    datos.update({
+        "libro": libro_datos,
+        "relacionados": relacionados,
+        "canonical": canonical,
+        "titulo_seo": "{} - {} | {}".format(
+            libro_datos["titulo"], libro_datos["autor"], NOMBRE_LIBRERIA
+        ),
+        "og_descripcion": descripcion,
+        "og_imagen": imagen_social(libro_datos),
+        "json_ld": json_ld(datos_ld),
+        "wa_libro": enlace_whatsapp(mensaje_libro(libro_datos)),
+    })
+    return render_template("libro.html", **datos)
+
+
+# ------------------------------ Buscadores -----------------------------------
+@app.route("/robots.txt")
+def robots():
+    lineas = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /api/",
+        "",
+        "Sitemap: " + url_absoluta("/sitemap.xml"),
+        "",
+    ]
+    return app.response_class("\n".join(lineas), mimetype="text/plain")
+
+
+@app.route("/sitemap.xml")
+def sitemap():
+    filas = get_db().execute(
+        "SELECT id, titulo, creado_en FROM libros ORDER BY id"
+    ).fetchall()
+
+    hoy = datetime.now().strftime("%Y-%m-%d")
+    lineas = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        "  <url>",
+        "    <loc>{}</loc>".format(url_absoluta("/")),
+        "    <lastmod>{}</lastmod>".format(hoy),
+        "    <changefreq>daily</changefreq>",
+        "    <priority>1.0</priority>",
+        "  </url>",
+    ]
+
+    for fila in filas:
+        dato = dict(fila)
+        fecha = dato["creado_en"]
+        lineas += [
+            "  <url>",
+            "    <loc>{}</loc>".format(url_absoluta(ruta_libro(dato))),
+            "    <lastmod>{}</lastmod>".format(
+                fecha.strftime("%Y-%m-%d") if fecha else hoy
+            ),
+            "    <changefreq>monthly</changefreq>",
+            "    <priority>0.8</priority>",
+            "  </url>",
+        ]
+
+    lineas.append("</urlset>")
+    respuesta = app.response_class("\n".join(lineas), mimetype="application/xml")
+    respuesta.headers["Cache-Control"] = "public, max-age=3600"
+    return respuesta
 
 
 # ---------------------------------- API --------------------------------------
@@ -280,7 +573,12 @@ def api_libros():
     sql += " ORDER BY " + ordenes.get(orden, ordenes["recientes"])
 
     filas = get_db().execute(sql, params).fetchall()
-    return jsonify({"total": len(filas), "libros": [dict(f) for f in filas]})
+    libros = []
+    for fila in filas:
+        dato = dict(fila)
+        dato["url"] = ruta_libro(dato)
+        libros.append(dato)
+    return jsonify({"total": len(libros), "libros": libros})
 
 
 @app.route("/api/libros/<int:libro_id>")
@@ -297,7 +595,9 @@ def api_libro(libro_id):
     ).fetchone()
     if fila is None:
         return jsonify({"error": "Libro no encontrado"}), 404
-    return jsonify(dict(fila))
+    dato = dict(fila)
+    dato["url"] = ruta_libro(dato)
+    return jsonify(dato)
 
 
 @app.route("/api/consultas", methods=["POST"])

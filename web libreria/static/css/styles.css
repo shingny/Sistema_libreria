@@ -321,6 +321,8 @@ a { color: inherit; text-decoration: none; }
   animation: rise .4s ease both;
 }
 .card:hover { transform: translateY(-6px); box-shadow: var(--shadow-md); border-color: transparent; }
+.card__link { display: flex; flex-direction: column; flex: 1; min-height: 0; color: inherit; }
+.card__link:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: -3px; border-radius: var(--radius); }
 .card__media { position: relative; aspect-ratio: 2 / 3; background: var(--surface-2); overflow: hidden; }
 .card__media img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; }
 .card:hover .card__media img { transform: scale(1.06); }
@@ -338,13 +340,13 @@ a { color: inherit; text-decoration: none; }
   display: grid; place-items: center; box-shadow: var(--shadow-sm);
 }
 .card__fav svg { width: 17px; height: 17px; }
-.card__body { padding: 16px 16px 18px; display: flex; flex-direction: column; flex: 1; }
+.card__body { padding: 16px 16px 0; display: flex; flex-direction: column; flex: 1; }
 .card__title {
   font-size: 1rem; font-weight: 700; margin-bottom: 4px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .card__author { color: var(--muted); font-size: .84rem; margin-bottom: 12px; }
-.card__foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.card__foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 16px 18px; }
 .card__price { font-size: 1.15rem; font-weight: 800; color: var(--primary-dark); }
 .card__price small { font-size: .7rem; font-weight: 600; color: var(--muted); display: block; }
 .card__btn {
@@ -677,3 +679,68 @@ a { color: inherit; text-decoration: none; }
 .errorcard h1 { font-size: 1.4rem; margin-bottom: 10px; }
 .errorcard p { color: var(--muted); }
 .errorcard__actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
+
+/* ========================= FICHA DE UN LIBRO =============================== */
+.migas { padding-top: calc(var(--header-h) + 14px); font-size: .85rem; color: var(--muted); }
+.migas a { color: var(--primary-dark); font-weight: 600; }
+.migas a:hover { text-decoration: underline; }
+.migas span[aria-hidden] { margin: 0 8px; opacity: .5; }
+
+.ficha__grid {
+  display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: 48px; align-items: start;
+}
+.ficha__media {
+  position: relative; border-radius: var(--radius);
+  overflow: hidden; box-shadow: var(--shadow-md);
+  background: var(--surface-2);
+  border-top: 6px solid var(--card-color, var(--primary));
+}
+.ficha__media img { width: 100%; height: auto; aspect-ratio: 2 / 3; object-fit: cover; }
+.ficha__cat {
+  display: inline-block; margin-bottom: 12px;
+  font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: #fff; padding: 6px 13px; border-radius: 999px;
+}
+.ficha h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); margin-bottom: 6px; }
+.ficha__autor { color: var(--muted); font-size: 1rem; margin-bottom: 18px; }
+.ficha__precio {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 14px 18px; margin-bottom: 20px;
+  background: var(--primary-soft); border-radius: var(--radius-sm);
+}
+.ficha__precio strong { font-size: 1.9rem; color: var(--primary-dark); line-height: 1; }
+.ficha__precio span { font-size: .8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.ficha__desc { color: var(--ink-2); }
+.ficha__specs {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px 24px; margin: 24px 0; padding: 20px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
+.ficha__specs dt { font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.ficha__specs dd { margin: 2px 0 0; font-weight: 600; color: var(--ink); }
+.ficha__acciones { display: flex; gap: 12px; flex-wrap: wrap; }
+.ficha__acciones .btn--wa { flex: 1 1 240px; }
+
+.relacionados { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; }
+.rel {
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  overflow: hidden; padding-bottom: 12px;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.rel:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+.rel img { width: 100%; height: auto; aspect-ratio: 2 / 3; object-fit: cover; margin-bottom: 8px; }
+.rel strong, .rel small, .rel__precio { padding: 0 12px; }
+.rel strong { font-size: .9rem; line-height: 1.3; }
+.rel small { color: var(--muted); font-size: .78rem; }
+.rel__precio { margin-top: auto; padding-top: 6px; font-weight: 800; color: var(--primary-dark); }
+
+@media (max-width: 900px) {
+  .ficha__grid { grid-template-columns: 1fr; gap: 28px; }
+  .ficha__media { max-width: 300px; margin: 0 auto; }
+}
+@media (max-width: 640px) {
+  .ficha__acciones .btn { width: 100%; }
+  .ficha__specs { padding: 16px; }
+}

@@ -5,6 +5,8 @@ por WhatsApp. Construido con **Python (Flask) + MySQL + HTML + CSS + JavaScript*
 La base de datos vive en **MySQL de Alwaysdata**; las credenciales se guardan en
 el archivo `.env`.
 
+> Este proyecto está en la carpeta **`web libreria/`** del repositorio.
+
 ---
 
 ## Características
@@ -48,12 +50,17 @@ web libreria/
 ├── iniciar.bat            # Arranque rápido en Windows
 ├── venv/                  # Entorno virtual de Python
 ├── templates/
-│   ├── index.html         # Página principal
-│   └── error.html         # Página de error (404, 500, ...)
+│   ├── index.html         # Página principal (catálogo)
+│   ├── libro.html         # Ficha pública de cada libro (/libro/...)
+│   ├── error.html         # Página de error (404, 500, ...)
+│   ├── _header.html       # Cabecera compartida
+│   ├── _footer.html       # Pie compartido
+│   └── _sprite.html       # Iconos SVG compartidos
 └── static/
     ├── css/styles.css     # Estilos (UX/UI)
     ├── js/main.js         # Lógica del catálogo y WhatsApp
     └── img/               # Carpeta de fotos (base de datos de imágenes)
+        ├── og-default.png # Imagen de vista previa al compartir
         ├── literatura/
         ├── ciencia-ficcion/
         ├── infantil/
@@ -169,11 +176,53 @@ Luego abre: <http://127.0.0.1:5000>
 | Método | Ruta | Descripción |
 | ------ | ---- | ----------- |
 | GET | `/` | Página del catálogo |
+| GET | `/libro/<id>-<slug>` | Ficha pública del libro (HTML con SEO) |
+| GET | `/libro/<id>` | Redirige (301) a la ficha con su título |
 | GET | `/api/categorias` | Categorías con total de libros |
 | GET | `/api/libros` | Libros. Filtros: `?q=`, `?categoria=`, `?orden=`, `?destacados=1` |
-| GET | `/api/libros/<id>` | Detalle de un libro |
+| GET | `/api/libros/<id>` | Detalle de un libro (incluye `url`) |
 | POST | `/api/consultas` | Registra una consulta `{ "libro_id": 1, "mensaje": "..." }` |
 | GET | `/api/consultas` | Últimas 200 consultas (requiere token de administrador) |
+| GET | `/sitemap.xml` | Mapa del sitio para buscadores (generado desde MySQL) |
+| GET | `/robots.txt` | Reglas de rastreo + referencia al sitemap |
+
+---
+
+## SEO y cómo se ve al compartir
+
+Cada libro tiene su **URL propia y estable**:
+
+```
+https://TU-SITIO/libro/5-1984
+```
+
+Esa página llega **renderizada desde el servidor** (no depende de JavaScript),
+con título, descripción, precio y portada. Incluye:
+
+- `<title>` y `meta description` propios
+- `link rel="canonical"`
+- **Open Graph** (`og:title`, `og:description`, `og:image`) y Twitter Card
+- **JSON-LD** `Book` + `Offer` (precio en `PEN`) y `BookStore` en la portada
+- Enlaces a otros libros de la misma categoría
+
+### La imagen que aparece al pegar el enlace
+
+`static/img/og-default.png` (1200×630) es la tarjeta que muestra WhatsApp al
+compartir la web. **WhatsApp y Facebook no muestran SVG**, así que las portadas
+generadas (`.svg`) no sirven como vista previa: si reemplazas una portada por
+una foto real (`.jpg`/`.png`/`.webp`), esa portada se usa automáticamente en la
+vista previa de su ficha.
+
+### `SITIO_URL`
+
+Para que `og:image` y `canonical` sean absolutos hay que indicar la URL pública:
+
+```ini
+SITIO_URL=https://sistema42.alwaysdata.net
+```
+
+En local se detecta sola (`http://localhost:5000`), pero una vista previa con
+`localhost` no funciona fuera de tu PC.
 
 ---
 
@@ -350,6 +399,7 @@ Todas tienen un valor por defecto y se pueden sobrescribir sin tocar el código:
 | `ADMIN_TOKEN` | aleatorio | Token fijo para `/api/consultas` |
 | `SECRET_KEY` | aleatorio | Clave secreta de Flask |
 | `HTTPS` | `0` | `1` cuando el sitio se sirve por HTTPS |
+| `SITIO_URL` | (vacío) | URL pública para `og:image`, `canonical` y sitemap |
 | `HOST` | `127.0.0.1` | Dirección de escucha |
 | `PORT` | `5000` | Puerto |
 | `FLASK_DEBUG` | `0` | `1` para el modo depuración |
