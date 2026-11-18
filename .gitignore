@@ -1,0 +1,15 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+
+# Base de datos local antigua (SQLite). Ya no se usa: el proyecto trabaja con MySQL.
+libreria.db
+
+# Credenciales de MySQL (NUNCA subir este archivo)
+.env
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
